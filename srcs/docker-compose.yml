@@ -1,0 +1,109 @@
+services:
+  mariadb:
+    build: ./requirements/mariadb
+    image: mariadb
+    container_name: mariadb
+    restart: on-failure
+    networks:
+      - inception_network
+    volumes:
+      - db_data:/var/lib/mysql
+    env_file: .env
+
+  wordpress:
+    build: ./requirements/wordpress
+    image: wordpress
+    container_name: wordpress
+    restart: on-failure
+    depends_on:
+      - mariadb
+    networks:
+      - inception_network
+    volumes:
+      - wp_data:/var/www/html
+    env_file: .env
+    environment:
+      - DB_HOST=mariadb
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USER=${MYSQL_USER}
+      - DB_PASS=${MYSQL_PASSWORD}
+
+  nginx:
+    build: ./requirements/nginx
+    image: nginx
+    container_name: nginx
+    restart: on-failure
+    depends_on:
+      - wordpress
+    ports:
+      - "443:443"
+    networks:
+      - inception_network
+    volumes:
+      - wp_data:/var/www/html
+
+  redis:
+    build: ./requirements/bonus/redis
+    container_name: redis
+    image: redis
+    restart: on-failure
+    networks:
+      - inception_network
+
+  ftp:
+    build: ./requirements/bonus/ftp
+    container_name: ftp
+    restart: on-failure
+    environment:
+      - FTP_USER=${FTP_USER}
+      - FTP_PASS=${FTP_PASS}
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - wp_data:/var/www/html
+    networks:
+      - inception_network
+
+  static-site:
+    build: ./requirements/bonus/static
+    container_name: static-site
+    restart: on-failure
+    networks:
+      - inception_network
+
+  adminer:
+    build: ./requirements/bonus/adminer
+    container_name: adminer
+    restart: on-failure
+    depends_on:
+      - mariadb
+    networks:
+      - inception_network
+
+  redis-commander:
+    build: ./requirements/bonus/redis_commander
+    container_name: redis-commander
+    restart: on-failure
+    depends_on:
+      - redis
+    networks:
+      - inception_network
+
+networks:
+  inception_network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/franmore/data/mariadb
+  wp_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/franmore/data/wordpress
